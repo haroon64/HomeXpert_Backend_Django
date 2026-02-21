@@ -15,15 +15,21 @@ class VendorProfile(models.Model):
 
     latitude = models.DecimalField(
         max_digits=10,  
-        decimal_places=6,
+        decimal_places=8,
         null=True,
         blank=True
     )
     longitude = models.DecimalField(
         max_digits=10,
-        decimal_places=6,
+        decimal_places=8,
         null=True,
         blank=True
+    )
+    profile_image = models.ImageField(
+        upload_to='vendorProfileImages/',  # Folder inside MEDIA_ROOT
+
+        blank=True,
+        null=True
     )
 
     phone_number = models.CharField(max_length=20, unique=True)
@@ -43,7 +49,7 @@ class VendorPortfolio(models.Model):
     vendor_profile = models.ForeignKey(
         VendorProfile,
         on_delete=models.CASCADE,
-        related_name="portfolios"
+        related_name="vendor_portfolios"
     )
 
     work_experience = models.TextField(blank=True, null=True)
@@ -59,7 +65,7 @@ class VendorPortfolioImage(models.Model):
     portfolio = models.ForeignKey(
         VendorPortfolio,
         on_delete=models.CASCADE,
-        related_name="images"
+        related_name="work_images"
     )
 
     image = models.ImageField(upload_to="vendor_portfolios/")

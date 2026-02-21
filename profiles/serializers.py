@@ -1,5 +1,9 @@
 from rest_framework import serializers
-from .models import CustomerProfile
+from drf_writable_nested.serializers import WritableNestedModelSerializer
+from .models import CustomerProfile,VendorProfile,VendorPortfolio,VendorPortfolioImage
+from collections import defaultdict
+import re
+from django.db import transaction
 
 class CustomerProfileSerializer(serializers.ModelSerializer):
     # Change these from SerializerMethodField to standard fields
@@ -54,14 +58,110 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
         return representation
     
 
-class VendorProfileSerializer(serializers.ModelSerializer):
-    # Change these from SerializerMethodField to standard fields
-    # We use 'source' or just handle them in the logic
-    
+class VendorPortfolioImageSerializer(serializers.ModelSerializer):
     class Meta:
-        model = CustomerProfile
+        model = VendorPortfolioImage
+        fields = ["id", "image"]
+
+class VendorPortfolioSerializer(WritableNestedModelSerializer):
+    work_images = VendorPortfolioImageSerializer(many=True, required=False)
+
+    class Meta:
+        model = VendorPortfolio
+        fields = ["id", "work_experience", "work_images"]
+
+class VendorProfileSerializer(WritableNestedModelSerializer):
+    
+    vendor_portfolios = VendorPortfolioSerializer(
+        many=True,
+        required=True
+    )
+    class Meta:
+        model = VendorProfile
         fields = [
-            "id", "full_name", "address", "phone_number", 
-            "gender", "profile_image", "created_at", "updated_at",
+            "id", "full_name", "address", "phone_number",
+            "second_phone_number",
+            "latitude", "longitude",
+            "profile_image",
+            "vendor_portfolios",
+            "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+    def create(self, validated_data):
+        portfolios_data = validated_data.pop("vendor_portfolios", [])
+
+        with transaction.atomic():
+            # Create VendorProfile first
+            vendor_profile = VendorProfile.objects.create(**validated_data)
+
+            # Create portfolios manually
+            for portfolio_data in portfolios_data:
+                images_data = portfolio_data.pop("work_images", [])
+
+                portfolio = VendorPortfolio.objects.create(
+                    vendor_profile=vendor_profile,
+                    **portfolio_data
+                )
+
+                for image_data in images_data:
+                    VendorPortfolioImage.objects.create(
+                        portfolio=portfolio,
+                        **image_data
+                    )
+
+        return vendor_profile
+
+    def to_internal_value(self, data):
+        """
+        Clean the incoming multipart/form-data BEFORE validation.
+        """
+        formatted_data = {}
+        portfolios = defaultdict(lambda: {"work_images": []})
+
+        for key in data.keys():
+            values = (
+                data.getlist(key)
+                if hasattr(data, "getlist")
+                else (data[key] if isinstance(data[key], list) else [data[key]])
+            )
+
+            # -----------------------------
+            # 1️⃣ Simple vendor_profile[field]
+            # -----------------------------
+            simple_match = re.match(r'vendor_profile\[(\w+)\]$', key)
+            if simple_match:
+                formatted_data[simple_match.group(1)] = values[0]
+                continue
+
+            # -----------------------------
+            # 2️⃣ Portfolio fields (INCLUDING [] cases)
+            # -----------------------------
+            portfolio_match = re.match(
+                r'vendor_profile\[vendor_portfolios_attributes\]\[(\d+)\]\[(\w+)\](?:\[\])?$',
+                key
+            )
+
+            if portfolio_match:
+                index = int(portfolio_match.group(1))
+                field = portfolio_match.group(2)
+
+                # ✅ Handle images properly
+                if field == "work_images":
+                    for file_obj in values:
+                        if file_obj:
+                            portfolios[index]["work_images"].append({
+                                "image": file_obj
+                            })
+
+                # Ignore empty keep_image_ids
+                elif field == "keep_image_ids":
+                    continue
+
+                else:
+                    portfolios[index][field] = values[0]
+
+        if portfolios:
+            formatted_data["vendor_portfolios"] = list(portfolios.values())
+        print("======> Formatted data for validation:", formatted_data)
+
+        return super().to_internal_value(formatted_data)
