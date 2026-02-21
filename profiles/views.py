@@ -4,8 +4,8 @@ from rest_framework import status, permissions
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from users.models import User
-from .models import CustomerProfile,VendorProfile
-from .serializers import CustomerProfileSerializer
+from .models import CustomerProfile,VendorProfile,VendorPortfolio,VendorPortfolioImage
+from .serializers import CustomerProfileSerializer,VendorProfileSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 
 class CustomerProfileCreateView(APIView):
@@ -52,17 +52,27 @@ class CustomerProfileDetailView(APIView):
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-class VendorProfileCreateView(APIView):
+class VendorProfileView(APIView):
     parser_classes = (MultiPartParser, FormParser)
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, pk):
+      
+        profile = get_object_or_404(VendorProfile, user=pk)
+        serializer = VendorProfileSerializer(profile, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
          # Check for duplicate
         if VendorProfile.objects.filter(user=request.user).exists():
             return Response({"error": "Profile already exists"}, status=400)
+        print("======> Creating vendor profile for:", request.user)
+        
+
 
         # The serializer now handles all that looping and gender mapping automatically!
-        serializer = CustomerProfileSerializer(data=request.data, context={'request': request})
+        serializer = VendorProfileSerializer(data=request.data, context={'request': request})
+
         serializer.is_valid(raise_exception=True)
         serializer.save(user=request.user)
 

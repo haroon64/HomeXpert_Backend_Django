@@ -158,6 +158,7 @@ REST_FRAMEWORK = {
       # Add this line
     ],
 }
+
 AUTH_USER_MODEL = 'users.User'
 
 
