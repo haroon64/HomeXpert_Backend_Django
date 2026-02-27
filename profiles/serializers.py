@@ -132,7 +132,7 @@ class VendorProfileSerializer(WritableNestedModelSerializer):
             if simple_match:
                 formatted_data[simple_match.group(1)] = values[0]
                 continue
-
+            
             # -----------------------------
             # 2️⃣ Portfolio fields (INCLUDING [] cases)
             # -----------------------------

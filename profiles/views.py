@@ -69,12 +69,10 @@ class VendorProfileView(APIView):
     
 
     def post(self, request):
-        print("======> Received POST data for vendor profile:", request.user)
+      
          # Check for duplicate
         if VendorProfile.objects.filter(user=request.user).exists():
             return Response({"error": "Profile already exists"}, status=400)
-        print("======> Creating vendor profile for:", request.user)
-        print("Incoming raw data:", request.data)
 
         data = request.data.copy()
 
@@ -91,3 +89,18 @@ class VendorProfileView(APIView):
         serializer.save(user=request.user)
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    def put(self, request, pk):
+        profile = get_object_or_404(VendorProfile, id=pk)
+        print("======> Updating profile for:", profile)
+
+
+        serializer = VendorProfileSerializer(
+            profile,
+            data=request.data,
+            partial=False,
+            context={'request': request} # allows partial update
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
