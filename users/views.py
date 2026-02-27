@@ -5,6 +5,9 @@ from rest_framework import status
 # from rest_framework.authtoken.models import Token
 from .serializers import LoginSerializer,RegisterSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework import permissions
+from django.shortcuts import get_object_or_404
+from .models import User
 
 
 class LoginAPIView(APIView):
@@ -41,3 +44,19 @@ class RegisterAPIView(APIView):
             "role": user.role,
           
         }, status=status.HTTP_201_CREATED)
+
+class UpdateRoleAPIView(APIView):
+    
+    def patch(self, request,pk):
+        user = get_object_or_404(User, id=pk)
+        print(f"Current user: {user.email}, current role: {user.role}")
+        print("Request data for role update:", request.data)
+        new_role = request.data.get('role')
+        print(f"Updating role for user {user.email} to {new_role}")
+
+        if new_role not in ['customer', 'vendor']:
+            return Response({"error": "Invalid role"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user.role = new_role
+        user.save()
+        return Response({"message": "Role updated successfully"}, status=status.HTTP_200_OK)
